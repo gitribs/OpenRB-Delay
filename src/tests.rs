@@ -34,7 +34,10 @@ fn run(params: Params, playhead: Playhead, left: &[f32], right: &[f32]) -> (Vec<
 /// samples. The first block is silent.
 #[test]
 fn wrapper_matches_delay_process() {
-    let params = Params::default();
+    let params = Params {
+        mix: 127,
+        ..Params::default()
+    };
     let nblocks = 4;
     let n = nblocks * BLOCK;
     let mut input_l = vec![0.0f32; n];
@@ -194,7 +197,10 @@ fn bypass_is_delayed_dry() {
 /// A short buffer leaves a remainder; the next call finishes the block.
 #[test]
 fn short_buffer_leaves_a_remainder() {
-    let params = Params::default();
+    let params = Params {
+        mix: 127,
+        ..Params::default()
+    };
     let mut p = DelayStereo::new();
     let mut l = [0.2f32; 32];
     let mut r = [0.2f32; 32];

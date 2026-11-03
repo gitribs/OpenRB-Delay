@@ -50,8 +50,8 @@ output/Standalone/OpenRB Delay.app
 
 | Control  | Range              | Notes                                         |
 |----------|--------------------|-----------------------------------------------|
-| Mix      | 0..127             | delay send via ReBirth `T[]`; default 127     |
-| Feedback | 0..127             | regeneration; default 80                      |
+| Mix      | 0..127             | delay send via ReBirth `T[]`; default 0       |
+| Feedback | 0..127             | regeneration; default 64                      |
 | Pan      | 0..127             | tap pan; default 64 (centre)                  |
 | Mode     | Triplet / Sixteenth| engine `0` is triplets; default Sixteenth (`1`) |
 | Steps    | 1..32              | delay length in steps; default 3              |

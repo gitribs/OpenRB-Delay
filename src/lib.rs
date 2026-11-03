@@ -40,9 +40,9 @@ impl Default for Params {
         Self {
             steps: d[delay::STEPS],
             mode: d[delay::MODE],
-            feedback: d[delay::FEEDBACK],
+            feedback: 64,
             pan: d[delay::PAN],
-            mix: 127,
+            mix: 0,
             bypass: 0,
         }
     }

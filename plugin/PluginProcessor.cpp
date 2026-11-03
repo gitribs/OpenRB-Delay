@@ -13,9 +13,9 @@ constexpr int kDelayBlock = 64;
 // state through setStateInformation, which replaces these after construction.
 constexpr int kDefaultSteps = 3;
 constexpr int kDefaultMode = 1; // Sixteenth
-constexpr int kDefaultFeedback = 80;
+constexpr int kDefaultFeedback = 64;
 constexpr int kDefaultPan = 64;
-constexpr int kDefaultMix = 127;
+constexpr int kDefaultMix = 0;
 
 bool ratesMatch (double a, double b)
 {
