@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "RecallImport.h"
 
 #include <algorithm>
 #include <cmath>
@@ -262,6 +263,16 @@ void DelayProcessor::processBlockBypassed (juce::AudioBuffer<float>& buffer, juc
 {
     juce::ignoreUnused (midi);
     processBuffer (buffer, true);
+}
+
+juce::String DelayProcessor::importRecall (const juce::String& text)
+{
+    DelayRecall parsed;
+    const auto err = parseRecall (text, parsed);
+    if (err.isNotEmpty())
+        return err;
+    applyRecall (apvts, parsed);
+    return {};
 }
 
 juce::AudioProcessorEditor* DelayProcessor::createEditor()

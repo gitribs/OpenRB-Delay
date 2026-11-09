@@ -163,6 +163,8 @@ target_sources(OpenRbDelay
         plugin/PluginProcessor.h
         plugin/PluginEditor.cpp
         plugin/PluginEditor.h
+        plugin/RecallImport.cpp
+        plugin/RecallImport.h
 )
 
 target_include_directories(OpenRbDelay PRIVATE include)
@@ -189,6 +191,46 @@ target_link_libraries(OpenRbDelay
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )
+
+juce_add_console_app(OpenRbDelayTests
+    PRODUCT_NAME "OpenRbDelayTests"
+)
+
+juce_generate_juce_header(OpenRbDelayTests)
+
+target_sources(OpenRbDelayTests
+    PRIVATE
+        tests/RecallImportTests.cpp
+        plugin/PluginProcessor.cpp
+        plugin/PluginProcessor.h
+        plugin/PluginEditor.cpp
+        plugin/PluginEditor.h
+        plugin/RecallImport.cpp
+        plugin/RecallImport.h
+)
+
+target_include_directories(OpenRbDelayTests PRIVATE include plugin)
+
+target_compile_definitions(OpenRbDelayTests
+    PUBLIC
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_VST3_CAN_REPLACE_VST2=0
+        JUCE_REPORT_APP_USAGE=0
+    PRIVATE
+        JucePlugin_Name="OpenRB Delay"
+)
+
+target_link_libraries(OpenRbDelayTests
+    PRIVATE
+        ${ORB_DELAY_LINK_LIB}
+        juce::juce_audio_utils
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags
+)
+
+enable_testing()
+add_test(NAME OpenRbDelayRecallImport COMMAND OpenRbDelayTests)
 
 # JUCE's copy step skips Standalone (it is an app, not a plugin format folder).
 if(APPLE)
