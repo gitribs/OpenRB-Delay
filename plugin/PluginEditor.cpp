@@ -16,6 +16,7 @@ constexpr int kModeRadioGroup = 1;
 constexpr int kEditorW = 560;
 constexpr int kEditorH = 240;
 constexpr int kGearSize = 24;
+constexpr int kOnWidth = 32;
 
 class IncDecArrowButton final : public juce::Button
 {
@@ -138,6 +139,26 @@ juce::Button* DelayLookAndFeel::createSliderButton (juce::Slider&, bool isIncrem
     return new IncDecArrowButton (isIncrement);
 }
 
+void DelayLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b,
+                                         bool highlighted, bool down)
+{
+    if (b.getRadioGroupId() != 0)
+    {
+        LookAndFeel_V4::drawToggleButton (g, b, highlighted, down);
+        return;
+    }
+
+    auto r = b.getLocalBounds().toFloat().reduced (0.5f);
+    g.setColour (kWell);
+    g.fillRoundedRectangle (r, 2.0f);
+    const bool on = b.getToggleState() || down;
+    g.setColour (! b.isEnabled() ? kLine.withAlpha (0.4f) : (highlighted || on ? kAmber : kLine));
+    g.drawRoundedRectangle (r, 2.0f, 1.0f);
+    g.setColour (! b.isEnabled() ? kMuted.withAlpha (0.45f) : (on || highlighted ? kAmber : kText));
+    g.setFont (juce::FontOptions (11.0f, juce::Font::bold));
+    g.drawText (b.getButtonText(), b.getLocalBounds(), juce::Justification::centred, false);
+}
+
 juce::Font DelayLookAndFeel::getLabelFont (juce::Label& label)
 {
     return label.getFont();
@@ -178,6 +199,59 @@ void GearButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
     g.fillEllipse (c.x - hole, c.y - hole, hole * 2.0f, hole * 2.0f);
 }
 
+PrintLaneButton::PrintLaneButton() : juce::Button ({})
+{
+    setName ("Print");
+    setClickingTogglesState (true);
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+}
+
+void PrintLaneButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
+{
+    auto r = getLocalBounds().toFloat().reduced (0.5f);
+    g.setColour (kWell);
+    g.fillRoundedRectangle (r, 2.0f);
+    const bool on = isEnabled() && (getToggleState() || down);
+    g.setColour (! isEnabled() ? kLine.withAlpha (0.4f) : (highlighted || on ? kAmber : kLine));
+    g.drawRoundedRectangle (r, 2.0f, 1.0f);
+
+    auto inner = r.reduced (4.4f, 5.2f);
+    g.setColour (! isEnabled() ? kMuted.withAlpha (0.35f)
+                               : (on ? kAmber.withAlpha (0.45f) : kMuted.withAlpha (0.55f)));
+    g.drawLine (inner.getX(), inner.getBottom(), inner.getRight(), inner.getBottom(), 1.0f);
+
+    const float x0 = inner.getX();
+    const float x1 = inner.getX() + inner.getWidth() * 0.34f;
+    const float x2 = inner.getX() + inner.getWidth() * 0.66f;
+    const float x3 = inner.getRight();
+    const float y0 = inner.getBottom() - 1.2f;
+    const float y1 = inner.getY() + inner.getHeight() * 0.52f;
+    const float y2 = inner.getY() + 1.0f;
+    juce::Path stair;
+    stair.startNewSubPath (x0, y0);
+    stair.lineTo (x1, y0);
+    stair.lineTo (x1, y1);
+    stair.lineTo (x2, y1);
+    stair.lineTo (x2, y2);
+    stair.lineTo (x3, y2);
+    g.setColour (! isEnabled() ? kMuted.withAlpha (0.45f) : (on || highlighted ? kAmber : kText));
+    g.strokePath (stair, juce::PathStrokeType (on ? 1.6f : 1.2f,
+                                               juce::PathStrokeType::mitered,
+                                               juce::PathStrokeType::square));
+}
+
+void PrintLaneButton::mouseDown (const juce::MouseEvent& e)
+{
+    if (! e.mods.isPopupMenu())
+        juce::Button::mouseDown (e);
+}
+
+void PrintLaneButton::mouseUp (const juce::MouseEvent& e)
+{
+    if (! e.mods.isPopupMenu())
+        juce::Button::mouseUp (e);
+}
+
 class RecallImportPanel final : public juce::Component
 {
 public:
@@ -190,7 +264,8 @@ public:
         heading.setFont (juce::FontOptions().withHeight (16.0f).withStyle ("Bold"));
         addAndMakeVisible (heading);
 
-        hint.setText ("Paste OpenRB Delay settings copied from Modloader.", juce::dontSendNotification);
+        hint.setText ("Paste OpenRB Delay settings copied from Modloader. Clipboard can include song automation for Print.",
+                      juce::dontSendNotification);
         hint.setJustificationType (juce::Justification::centredLeft);
         hint.setColour (juce::Label::textColourId, kMuted);
         hint.setFont (juce::FontOptions (12.0f));
@@ -199,7 +274,7 @@ public:
         editor.setMultiLine (true);
         editor.setReturnKeyStartsNewLine (true);
         editor.setFont (juce::FontOptions (13.0f));
-        editor.setTextToShowWhenEmpty ("openrb-delay 1\nmix: 22\nsteps: 8\nmode: sixteenth\n...", kMuted);
+        editor.setTextToShowWhenEmpty ("openrb-delay 1\nenabled: 1\nmix: 22\nsteps: 8\nmode: sixteenth\n...", kMuted);
         addAndMakeVisible (editor);
 
         status.setJustificationType (juce::Justification::centredLeft);
@@ -261,7 +336,7 @@ public:
     {
         auto r = cardBounds().reduced (16);
         heading.setBounds (r.removeFromTop (22));
-        hint.setBounds (r.removeFromTop (18));
+        hint.setBounds (r.removeFromTop (32));
         r.removeFromTop (8);
         auto buttons = r.removeFromBottom (28);
         r.removeFromBottom (8);
@@ -313,7 +388,8 @@ DelayEditor::DelayEditor (DelayProcessor& p)
       mixA (p.apvts, "mix", mix),
       feedbackA (p.apvts, "feedback", feedback),
       panA (p.apvts, "pan", pan),
-      stepsA (p.apvts, "steps", steps)
+      stepsA (p.apvts, "steps", steps),
+      enableA (p.apvts, "enabled", enableBtn)
 {
     setLookAndFeel (&lnf);
     setSize (kEditorW, kEditorH);
@@ -348,12 +424,41 @@ DelayEditor::DelayEditor (DelayProcessor& p)
     modeN.setJustificationType (juce::Justification::centredLeft);
     stepsN.setJustificationType (juce::Justification::centredLeft);
 
+    enableBtn.setButtonText ("ON");
+    enableBtn.setTooltip ("Device on. Off kills delay tails in the engine; host Device On is delayed dry.");
+    enableBtn.setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    addAndMakeVisible (enableBtn);
+
     gear.onClick = [this] { setImportOpen (importPanel == nullptr || ! importPanel->isVisible()); };
     addAndMakeVisible (gear);
+
+    printBtn.setTooltip ("Import already arms Print when the clipboard has events. Arming writes "
+                         "bar-1 values immediately so Latch or Write capture the start. Set this "
+                         "Delay track to Latch or Write (not Touch), play from bar 1 once, then "
+                         "stop. Mix, Steps, Mode, Feedback, Pan, and On become host automation. Host loop off.");
+    printBtn.onClick = [this]
+    {
+        if (owner.wrapperType == juce::AudioProcessor::wrapperType_Standalone)
+        {
+            printBtn.setToggleState (false, juce::dontSendNotification);
+            return;
+        }
+        if (printBtn.getToggleState())
+            owner.setPrintArmed (true);
+        else
+            owner.setPrintArmed (false);
+        syncPrintButton();
+    };
+    addAndMakeVisible (printBtn);
+    syncPrintButton();
+    if (p.wrapperType != juce::AudioProcessor::wrapperType_Standalone)
+        startTimerHz (10);
+    resized();
 }
 
 DelayEditor::~DelayEditor()
 {
+    stopTimer();
     setLookAndFeel (nullptr);
 }
 
@@ -424,12 +529,28 @@ void DelayEditor::setImportOpen (bool open)
         importPanel->setVisible (true);
         importPanel->toFront (false);
         gear.toFront (false);
+        printBtn.toFront (false);
+        enableBtn.toFront (false);
         importPanel->reset();
         return;
     }
 
     if (importPanel != nullptr)
         importPanel->setVisible (false);
+    syncPrintButton();
+}
+
+void DelayEditor::timerCallback()
+{
+    syncPrintButton();
+}
+
+void DelayEditor::syncPrintButton()
+{
+    const bool standalone = owner.wrapperType == juce::AudioProcessor::wrapperType_Standalone;
+    printBtn.setVisible (! standalone);
+    printBtn.setEnabled (! standalone && owner.hasPrintTake());
+    printBtn.setToggleState (! standalone && owner.isPrintArmed(), juce::dontSendNotification);
 }
 
 void DelayEditor::paint (juce::Graphics& g)
@@ -449,12 +570,25 @@ void DelayEditor::resized()
         importPanel->setBounds (bounds);
 
     auto top = bounds.reduced (16);
-    gear.setBounds (top.removeFromTop (kGearSize).removeFromRight (kGearSize));
+    auto tools = top.removeFromTop (kGearSize);
+    gear.setBounds (tools.removeFromRight (kGearSize));
+    if (printBtn.isVisible())
+    {
+        tools.removeFromRight (6);
+        printBtn.setBounds (tools.removeFromRight (kGearSize));
+        printBtn.toFront (false);
+    }
+    tools.removeFromRight (6);
+    enableBtn.setBounds (tools.removeFromRight (kOnWidth));
+    enableBtn.toFront (false);
     gear.toFront (false);
 
     auto r = getLocalBounds().reduced (24);
     auto titleRow = r.removeFromTop (28);
     titleRow.removeFromRight (kGearSize);
+    if (printBtn.isVisible())
+        titleRow.removeFromRight (kGearSize + 6);
+    titleRow.removeFromRight (kOnWidth + 6);
     title.setBounds (titleRow);
     r.removeFromTop (8);
 

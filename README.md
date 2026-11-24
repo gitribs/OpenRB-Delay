@@ -62,10 +62,24 @@ one-time `notarytool store-credentials` setup. `--skip-build` packages the curre
 
 | Control  | Range              | Notes                                         |
 |----------|--------------------|-----------------------------------------------|
+| ON       | off/on             | internal device on; default on. Off kills tails in the engine |
 | Mix      | 0..127             | delay send via ReBirth `T[]`; default 0       |
 | Feedback | 0..127             | regeneration; default 64                      |
 | Pan      | 0..127             | tap pan; default 64 (centre)                  |
 | Mode     | Triplet / Sixteenth| engine `0` is triplets; default Sixteenth (`1`) |
 | Steps    | 1..32              | delay length in steps; default 3              |
+
+ON is left of Print, Print left of the gear (standalone hides Print, so ON sits left of the gear).
+Host Device On / bypass is separate: it skips DSP and keeps the 64-sample delayed-dry FIFO.
+
+The gear imports a snapshot copied from Modloader (`openrb-delay 1`). Paste applies Mix, Steps,
+Mode, Feedback, Pan, and `enabled:` (0 or 1). Missing `enabled:` stays on so older clipboards still
+load. When the clipboard also has `openrb-print 1`, Delay stores those events — including the
+`enabled` lane — and auto-arms Print (the stair-step control left of the gear). Arming writes bar-1
+values immediately so Latch or Write capture the start. Set the Delay track to Latch or Write (not
+Touch), play from bar 1 once, then stop. Mix / Steps / Mode / Feedback / Pan that moved in the song
+become host automation; Enable is always printed and writes stepped On/Off. Static knobs stay at
+the snapshot. Host loop off during the take. Logic’s AU wrapper is the safer Logic path. Ableton
+Live is the host most likely to ignore plugin-originated gestures. Standalone has no Print control.
 
 At 44100 Hz the resamplers are bypassed, so the samples that reach `Delay` are the host samples.

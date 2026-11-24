@@ -16,6 +16,7 @@ typedef struct OrbDelayParams {
     uint8_t pan;       /* 0..127 */
     uint8_t mix;       /* 0..127 delay send, ReBirth T[] curve */
     uint8_t bypass;
+    uint8_t enabled;   /* 0|1, default 1; internal device on, not host bypass */
 } OrbDelayParams;
 
 typedef struct OrbDelayPlayhead {

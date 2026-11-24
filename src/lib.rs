@@ -32,6 +32,8 @@ pub struct Params {
     /// Delay send 0..127, mapped through ReBirth's level curve `T[]`.
     pub mix: u8,
     pub bypass: u8,
+    /// Internal device on (engine `ENABLED`). Independent of host `bypass`.
+    pub enabled: u8,
 }
 
 impl Default for Params {
@@ -44,6 +46,7 @@ impl Default for Params {
             pan: d[delay::PAN],
             mix: 0,
             bypass: 0,
+            enabled: d[delay::ENABLED],
         }
     }
 }
@@ -174,7 +177,8 @@ impl DelayStereo {
         self.delay.set_param(delay::MODE as u8, p.mode);
         self.delay.set_param(delay::FEEDBACK as u8, feedback);
         self.delay.set_param(delay::PAN as u8, pan);
-        self.delay.set_param(delay::ENABLED as u8, 1);
+        let enabled = if p.enabled != 0 { 1 } else { 0 };
+        self.delay.set_param(delay::ENABLED as u8, enabled);
     }
 }
 

@@ -16,7 +16,10 @@ fn apply(d: &mut Delay, params: Params) {
     d.set_param(delay::MODE as u8, params.mode);
     d.set_param(delay::FEEDBACK as u8, params.feedback.min(127));
     d.set_param(delay::PAN as u8, params.pan.min(127));
-    d.set_param(delay::ENABLED as u8, 1);
+    d.set_param(
+        delay::ENABLED as u8,
+        if params.enabled != 0 { 1 } else { 0 },
+    );
 }
 
 fn bpm(bpm: f64) -> Playhead {
@@ -96,6 +99,7 @@ fn impulse_at_one_sixteenth_returns_at_5512() {
         pan: 64,
         mix: 127,
         bypass: 0,
+        enabled: 1,
     };
     let n = 100 * BLOCK;
     let mut input_l = vec![0.0f32; n];
@@ -129,6 +133,7 @@ fn triplet_and_sixteenth_differ() {
         pan: 64,
         mix: 127,
         bypass: 0,
+        enabled: 1,
     };
     let trip = Params { mode: 0, ..six };
 
@@ -147,6 +152,7 @@ fn tempo_changes_length() {
         pan: 64,
         mix: 127,
         bypass: 0,
+        enabled: 1,
     };
     let n = 100 * BLOCK;
     let mut input_l = vec![0.0f32; n];
@@ -169,6 +175,7 @@ fn bypass_is_delayed_dry() {
         pan: 64,
         mix: 127,
         bypass: 1,
+        enabled: 0,
     };
     let n = 2 * BLOCK;
     let mut input_l = vec![0.0f32; n];
@@ -191,6 +198,11 @@ fn bypass_is_delayed_dry() {
     assert_eq!(
         wrap.delay().live[delay::STEPS],
         delay::DEFAULTS[delay::STEPS]
+    );
+    // Host bypass skips apply_params, so Enable is not written to the engine.
+    assert_eq!(
+        wrap.delay().live[delay::ENABLED],
+        delay::DEFAULTS[delay::ENABLED]
     );
 }
 
@@ -231,6 +243,7 @@ fn steps_and_pan_are_clamped() {
             pan: 64,
             mix: 127,
             bypass: 0,
+            enabled: 1,
         },
         bpm(120.0),
     );
@@ -249,6 +262,7 @@ fn steps_and_pan_are_clamped() {
             pan: 255,
             mix: 255,
             bypass: 0,
+            enabled: 1,
         },
         bpm(120.0),
     );
@@ -299,6 +313,7 @@ fn mix_uses_the_level_curve() {
         pan: 64,
         mix: 127,
         bypass: 0,
+        enabled: 1,
     };
     let at = 5512 + BLOCK;
     let peak = |mix: u8| {
@@ -316,4 +331,93 @@ fn mix_uses_the_level_curve() {
     assert!(t.level[64] < 0.1);
     assert!((mid - wet * t.level[64]).abs() < 1e-5);
     assert_eq!(clamped, wet);
+}
+
+/// Internal Enable off is delayed dry: the engine still runs and returns the bus unchanged.
+#[test]
+fn enabled_off_is_delayed_dry() {
+    let params = Params {
+        steps: 3,
+        mode: 1,
+        feedback: 80,
+        pan: 64,
+        mix: 127,
+        bypass: 0,
+        enabled: 0,
+    };
+    let n = 2 * BLOCK;
+    let mut input_l = vec![0.0f32; n];
+    let mut input_r = vec![0.0f32; n];
+    for i in 0..n {
+        input_l[i] = (i as f32) * 0.001;
+        input_r[i] = -(i as f32) * 0.002;
+    }
+
+    let mut wrap_l = input_l.clone();
+    let mut wrap_r = input_r.clone();
+    let mut wrap = DelayStereo::new();
+    wrap.process(&mut wrap_l, &mut wrap_r, params, bpm(120.0));
+
+    assert!(wrap_l[..BLOCK].iter().all(|&x| x == 0.0));
+    assert!(wrap_r[..BLOCK].iter().all(|&x| x == 0.0));
+    assert_eq!(&wrap_l[BLOCK..], &input_l[..BLOCK]);
+    assert_eq!(&wrap_r[BLOCK..], &input_r[..BLOCK]);
+    assert_eq!(wrap.delay().live[delay::ENABLED], 0);
+    assert_eq!(wrap.blocks_processed(), 2);
+}
+
+/// Disable while Mix is high refills the line: the wet repeat is gone, not frozen in the buffer.
+#[test]
+fn enabled_off_kills_wet_repeats() {
+    let on = Params {
+        steps: 1,
+        mode: 1,
+        feedback: 0,
+        pan: 64,
+        mix: 127,
+        bypass: 0,
+        enabled: 1,
+    };
+    let off = Params { enabled: 0, ..on };
+    let n = 100 * BLOCK;
+    let mut input_l = vec![0.0f32; n];
+    let mut input_r = vec![0.0f32; n];
+    input_l[0] = 0.5;
+    input_r[0] = 0.5;
+    let at = 5512 + BLOCK;
+
+    let (on_l, _) = run(on, bpm(120.0), &input_l, &input_r);
+    assert!(on_l[at] > 0.4);
+
+    let mut wrap_l = input_l.clone();
+    let mut wrap_r = input_r.clone();
+    let mut wrap = DelayStereo::new();
+    wrap.process(
+        &mut wrap_l[..2 * BLOCK],
+        &mut wrap_r[..2 * BLOCK],
+        on,
+        bpm(120.0),
+    );
+    wrap.process(
+        &mut wrap_l[2 * BLOCK..],
+        &mut wrap_r[2 * BLOCK..],
+        off,
+        bpm(120.0),
+    );
+
+    assert_eq!(wrap.delay().live[delay::ENABLED], 0);
+    assert!(wrap_l[at].abs() < 1e-5);
+}
+
+/// steps, mode, feedback, pan, mix, bypass, enabled — seven bytes, enabled last.
+#[test]
+fn params_abi_enabled_is_last_byte() {
+    assert_eq!(std::mem::size_of::<Params>(), 7);
+    assert_eq!(std::mem::offset_of!(Params, steps), 0);
+    assert_eq!(std::mem::offset_of!(Params, mode), 1);
+    assert_eq!(std::mem::offset_of!(Params, feedback), 2);
+    assert_eq!(std::mem::offset_of!(Params, pan), 3);
+    assert_eq!(std::mem::offset_of!(Params, mix), 4);
+    assert_eq!(std::mem::offset_of!(Params, bypass), 5);
+    assert_eq!(std::mem::offset_of!(Params, enabled), 6);
 }
